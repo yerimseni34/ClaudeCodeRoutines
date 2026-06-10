@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, save, softDelete, getSettings, DEFAULT_SETTINGS, uid } from "../db/db";
 import { TopBar, NumInput, Bar } from "../components/ui";
@@ -9,6 +9,7 @@ import { macrosToKcal } from "../lib/calc";
 import { todayKey, prettyDate, shortDate } from "../lib/date";
 import { SQL_SETUP } from "../lib/setupSql";
 import { getGeminiKey, setGeminiKey, getGeminiModel, setGeminiModel } from "../lib/visionApi";
+import { importWorkoutCsv, type ImportResult } from "../lib/importWorkouts";
 import type { Settings, BodyLogEntry } from "../lib/types";
 
 export default function Profile() {
@@ -269,6 +270,24 @@ function AboutCard() {
     f: await db.foodLog.filter((x) => !x.deleted).count(),
     r: await db.routines.filter((x) => !x.deleted).count(),
   }), []);
+  const importInput = useRef<HTMLInputElement | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+
+  async function onImport(file: File) {
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const text = await file.text();
+      const res: ImportResult = await importWorkoutCsv(text);
+      if (res.error) setImportMsg("⚠️ " + res.error);
+      else setImportMsg(`✓ ${res.workouts} antrenman, ${res.sets} set yüklendi${res.exercises ? ` (+${res.exercises} yeni egzersiz)` : ""}. Geçmiş sekmesinde görebilirsin.`);
+    } catch (e: any) {
+      setImportMsg("⚠️ Dosya okunamadı: " + (e?.message || e));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function exportData() {
     const data = {
@@ -294,6 +313,17 @@ function AboutCard() {
       <div className="small muted" style={{ marginBottom: 10 }}>
         {counts ? `${counts.w} antrenman · ${counts.f} yemek kaydı · ${counts.r} rutin` : "…"}
       </div>
+
+      <input ref={importInput} type="file" accept=".csv,text/csv" hidden
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
+      <button className="btn ghost block" disabled={importing} onClick={() => importInput.current?.click()}>
+        {importing ? "Yükleniyor…" : "⬆️ Antrenman geçmişi içe aktar (Hevy/Strong CSV)"}
+      </button>
+      <div className="tiny muted" style={{ margin: "6px 2px 12px" }}>
+        Eski uygulamandan (Hevy → Settings → Export Data) aldığın .csv dosyasını seç.
+      </div>
+      {importMsg && <div className={`syncbar ${importMsg.startsWith("✓") ? "ok" : "warn"}`} style={{ marginBottom: 12 }}>{importMsg}</div>}
+
       <button className="btn ghost block" onClick={exportData}>⬇️ Yedeği indir (JSON)</button>
       <div className="tiny muted center" style={{ marginTop: 14 }}>FitLog · kişisel antrenman & beslenme · offline-first</div>
     </div>
