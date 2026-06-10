@@ -8,6 +8,7 @@ import { resetPullCursor } from "../sync/sync";
 import { macrosToKcal } from "../lib/calc";
 import { todayKey, prettyDate, shortDate } from "../lib/date";
 import { SQL_SETUP } from "../lib/setupSql";
+import { getGeminiKey, setGeminiKey, getGeminiModel, setGeminiModel } from "../lib/visionApi";
 import type { Settings, BodyLogEntry } from "../lib/types";
 
 export default function Profile() {
@@ -19,6 +20,7 @@ export default function Profile() {
       <div className="page">
         <GoalsCard settings={settings} />
         <WeightCard />
+        <VisionCard />
         <CloudCard />
         <AboutCard />
       </div>
@@ -117,6 +119,46 @@ function Sparkline({ data }: { data: number[] }) {
     <svg className="sparkline" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
       <polyline fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" points={pts.join(" ")} />
     </svg>
+  );
+}
+
+function VisionCard() {
+  const [key, setKey] = useState(getGeminiKey());
+  const [model, setModel] = useState(getGeminiModel());
+  const [saved, setSaved] = useState(false);
+
+  function persist() {
+    setGeminiKey(key);
+    setGeminiModel(model);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1200);
+  }
+
+  return (
+    <div className="card">
+      <div className="row between">
+        <b>📷 Fotoğrafla Kalori (AI)</b>
+        <span className="pill" style={{ background: key ? "rgba(34,197,94,0.18)" : undefined, color: key ? "#86efac" : undefined }}>
+          {key ? "açık" : "kapalı"}
+        </span>
+      </div>
+      <div className="hr" />
+      <div className="small muted" style={{ marginBottom: 12 }}>
+        Yemek fotoğrafı çekip kalori/makro tahmini almak için <b>ücretsiz</b> bir Google Gemini anahtarı gir.
+        Anahtar yalnızca bu cihazda saklanır. Tahminler yaklaşıktır (±%20-30) — ekledikten önce gramı düzeltebilirsin.
+      </div>
+      <div className="field"><label>Gemini API Anahtarı</label>
+        <input className="input" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="AIza..." />
+      </div>
+      <div className="field"><label>Model (opsiyonel)</label>
+        <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="gemini-2.0-flash" />
+      </div>
+      <button className="btn ghost block" onClick={persist}>{saved ? "Kaydedildi ✓" : "Kaydet"}</button>
+      <a className="tiny" style={{ display: "block", marginTop: 10, textAlign: "center" }}
+        href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
+        Ücretsiz anahtar al → aistudio.google.com/apikey
+      </a>
+    </div>
   );
 }
 

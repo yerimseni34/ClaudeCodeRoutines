@@ -6,6 +6,8 @@ import { TopBar, Sheet, mealLabel, NumInput } from "../components/ui";
 import { searchFoods } from "../lib/foodApi";
 import { scaleMacros } from "../lib/calc";
 import { todayKey } from "../lib/date";
+import { fileToDownscaledBase64 } from "../lib/image";
+import { analyzeFoodPhoto, hasVision, type DetectedFood } from "../lib/visionApi";
 import type { Food, FoodLogEntry, Macros, MealType } from "../lib/types";
 
 const MEALS: MealType[] = ["kahvalti", "ogle", "aksam", "atistirmalik"];
@@ -23,6 +25,34 @@ export default function AddFood() {
   const [picked, setPicked] = useState<Food | null>(null);
   const [manual, setManual] = useState(false);
   const abort = useRef<AbortController | null>(null);
+
+  // Fotoğraf analizi durumu
+  const photoInput = useRef<HTMLInputElement | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [detected, setDetected] = useState<DetectedFood[] | null>(null);
+  const [photoErr, setPhotoErr] = useState("");
+
+  async function onPhoto(file: File) {
+    setPhotoErr("");
+    if (!hasVision()) {
+      setPhotoErr("Önce Profil → Fotoğrafla Kalori bölümünden ücretsiz Gemini anahtarını gir.");
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const img = await fileToDownscaledBase64(file, 1024, 0.8);
+      const items = await analyzeFoodPhoto(img);
+      if (items.length === 0) setPhotoErr("Fotoğrafta yemek tanınamadı. Daha net bir fotoğraf dene.");
+      else setDetected(items);
+    } catch (e: any) {
+      const m = e?.message || String(e);
+      if (m === "no-key") setPhotoErr("Önce Profil'den Gemini anahtarını gir.");
+      else if (m === "bad-key") setPhotoErr("Gemini anahtarı geçersiz. Profil'den kontrol et.");
+      else setPhotoErr(m);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   // Kayıtlı / son yenen yemekler (offline çalışır).
   const saved = useLiveQuery(
@@ -56,7 +86,18 @@ export default function AddFood() {
       <TopBar title="Yemek Ekle" sub={mealLabel(meal)} back />
       <div className="page">
         <input className="input" placeholder="Yemek ara (ör. yulaf, tavuk göğsü)…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        <button className="btn ghost block" style={{ margin: "10px 0" }} onClick={() => setManual(true)}>✍️ Manuel ekle (kendi makroların)</button>
+
+        <input
+          ref={photoInput} type="file" accept="image/*" capture="environment" hidden
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
+        />
+        <div className="row" style={{ gap: 10, margin: "10px 0" }}>
+          <button className="btn primary grow" disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+            {photoBusy ? "🔍 Analiz ediliyor…" : "📷 Fotoğrafla Ekle"}
+          </button>
+          <button className="btn ghost grow" onClick={() => setManual(true)}>✍️ Manuel</button>
+        </div>
+        {photoErr && <div className="syncbar warn" style={{ margin: "0 0 8px" }}>{photoErr}</div>}
 
         {loading && <div className="small muted center" style={{ padding: 10 }}>Aranıyor…</div>}
         {err && <div className="syncbar warn" style={{ margin: "8px 0" }}>{err}</div>}
@@ -89,7 +130,81 @@ export default function AddFood() {
       )}
 
       <ManualSheet open={manual} onClose={() => setManual(false)} onCreated={(f) => { setManual(false); setPicked(f); }} />
+
+      {detected && (
+        <PhotoReviewSheet
+          items={detected} meal={meal} date={date}
+          onClose={() => setDetected(null)}
+          onSaved={() => nav("/nutrition", { replace: true })}
+        />
+      )}
     </>
+  );
+}
+
+// Fotoğraftan tanınan yemekler — düzenlenebilir, sonra günlüğe eklenir.
+function PhotoReviewSheet({ items, meal, date, onClose, onSaved }: { items: DetectedFood[]; meal: MealType; date: string; onClose: () => void; onSaved: () => void }) {
+  const [rows, setRows] = useState(items.map((d) => ({ ...d, include: true })));
+  const [mealSel, setMealSel] = useState<MealType>(meal);
+
+  function patchGrams(i: number, grams: number | null) {
+    setRows((rs) => rs.map((r, k) => (k === i ? { ...r, grams: grams ?? 0, portion: scaleMacros(r.per100, grams ?? 0) } : r)));
+  }
+  function toggle(i: number) {
+    setRows((rs) => rs.map((r, k) => (k === i ? { ...r, include: !r.include } : r)));
+  }
+
+  const chosen = rows.filter((r) => r.include && r.grams > 0);
+  const total = chosen.reduce((a, r) => a + r.portion.kcal, 0);
+
+  async function addAll() {
+    for (const r of chosen) {
+      const food: Food = { id: uid(), name: r.name, source: "custom", per100: r.per100, updatedAt: Date.now() };
+      await save(db.foods, food);
+      const entry: FoodLogEntry = {
+        id: uid(), date, meal: mealSel, foodName: r.name, grams: r.grams, macros: r.portion, updatedAt: Date.now(),
+      };
+      await save(db.foodLog, entry);
+    }
+    onSaved();
+  }
+
+  return (
+    <Sheet open onClose={onClose} title="📷 Tanınan Yemekler">
+      <div className="small muted" style={{ marginBottom: 12 }}>
+        Tahmini değerler — gramı düzeltebilir, istemediğini çıkarabilirsin. Kalori bir tahmindir.
+      </div>
+      <div className="field"><label>Öğün</label>
+        <div className="chiprow">
+          {(["kahvalti", "ogle", "aksam", "atistirmalik"] as MealType[]).map((m) => (
+            <button key={m} className={`chip ${mealSel === m ? "active" : ""}`} onClick={() => setMealSel(m)}>{mealLabel(m)}</button>
+          ))}
+        </div>
+      </div>
+      {rows.map((r, i) => (
+        <div key={i} className="card tight" style={{ opacity: r.include ? 1 : 0.5 }}>
+          <div className="row between" style={{ marginBottom: 8 }}>
+            <b className="grow truncate">{r.name}</b>
+            <button className={`checkbtn ${r.include ? "on" : ""}`} onClick={() => toggle(i)}>✓</button>
+          </div>
+          <div className="row" style={{ gap: 10, alignItems: "center" }}>
+            <div className="col" style={{ width: 110 }}>
+              <span className="tiny muted">Gram</span>
+              <NumInput className="input" value={r.grams} onChange={(v) => patchGrams(i, v)} />
+            </div>
+            <div className="grow center">
+              <div className="bold" style={{ fontSize: 18 }}>{r.portion.kcal} kcal</div>
+              <div className="tiny muted">P{r.portion.protein} · K{r.portion.carb} · Y{r.portion.fat}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="row between" style={{ margin: "12px 4px" }}>
+        <span className="muted">Toplam</span>
+        <b>{total} kcal · {chosen.length} öğe</b>
+      </div>
+      <button className="btn primary block" disabled={chosen.length === 0} onClick={addAll}>Seçilenleri Günlüğe Ekle</button>
+    </Sheet>
   );
 }
 

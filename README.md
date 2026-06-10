@@ -17,6 +17,11 @@ Kişisel **antrenman** ve **beslenme/makro** takip uygulaması. Tamamen **offlin
 - Öğünlere göre (kahvaltı/öğle/akşam/atıştırmalık) **günlük kalori ve makro** takibi, hedefe göre kalan/fazla.
 - Günlük geçmiş — geçmiş günlere git, o gün ne yediğini gör.
 
+### Fotoğrafla Kalori (AI, opsiyonel)
+- Yemek **fotoğrafı** çek → yapay zeka yemekleri tanır, porsiyon (gram) ve kalori/makro **tahmini** verir → düzelt ve günlüğe ekle.
+- **Google Gemini**'nin ücretsiz katmanını kullanır (kart gerektirmez). Anahtar Profil'den girilir, yalnızca cihazda saklanır.
+- Tahminler yaklaşıktır (±%20-30); paketli ürünler için yemek arama/barkod daha doğrudur.
+
 ### Diğer
 - **Vücut ağırlığı** takibi + trend grafiği, kalori/makro/kilo **hedefleri**.
 - **Yedek indirme** (JSON).
