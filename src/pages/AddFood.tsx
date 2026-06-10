@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, save, uid } from "../db/db";
 import { TopBar, Sheet, mealLabel, NumInput } from "../components/ui";
-import { searchFoods } from "../lib/foodApi";
+import { searchFoods, lookupBarcode } from "../lib/foodApi";
 import { scaleMacros } from "../lib/calc";
 import { todayKey } from "../lib/date";
 import { fileToDownscaledBase64 } from "../lib/image";
 import { analyzeFoodPhoto, hasVision, type DetectedFood } from "../lib/visionApi";
+import { BarcodeScanner } from "../components/BarcodeScanner";
 import type { Food, FoodLogEntry, Macros, MealType } from "../lib/types";
 
 const MEALS: MealType[] = ["kahvalti", "ogle", "aksam", "atistirmalik"];
@@ -25,6 +26,26 @@ export default function AddFood() {
   const [picked, setPicked] = useState<Food | null>(null);
   const [manual, setManual] = useState(false);
   const abort = useRef<AbortController | null>(null);
+
+  // Barkod durumu
+  const [scanning, setScanning] = useState(false);
+  const [barBusy, setBarBusy] = useState(false);
+  const [barErr, setBarErr] = useState("");
+
+  async function onBarcode(code: string) {
+    setScanning(false);
+    setBarErr("");
+    setBarBusy(true);
+    try {
+      const food = await lookupBarcode(code);
+      if (food) setPicked(food);
+      else setBarErr(`Bu barkod (${code}) veritabanında yok. Manuel ekleyebilirsin.`);
+    } catch {
+      setBarErr("Arama başarısız — çevrimdışı olabilirsin.");
+    } finally {
+      setBarBusy(false);
+    }
+  }
 
   // Fotoğraf analizi durumu
   const photoInput = useRef<HTMLInputElement | null>(null);
@@ -91,13 +112,17 @@ export default function AddFood() {
           ref={photoInput} type="file" accept="image/*" capture="environment" hidden
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
         />
-        <div className="row" style={{ gap: 10, margin: "10px 0" }}>
-          <button className="btn primary grow" disabled={photoBusy} onClick={() => photoInput.current?.click()}>
-            {photoBusy ? "🔍 Analiz ediliyor…" : "📷 Fotoğrafla Ekle"}
+        <button className="btn primary block" style={{ margin: "10px 0 8px" }} disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+          {photoBusy ? "🔍 Analiz ediliyor…" : "📷 Fotoğrafla Ekle"}
+        </button>
+        <div className="row" style={{ gap: 10, marginBottom: 8 }}>
+          <button className="btn ghost grow" disabled={barBusy} onClick={() => setScanning(true)}>
+            {barBusy ? "🔎 Aranıyor…" : "📦 Barkod"}
           </button>
           <button className="btn ghost grow" onClick={() => setManual(true)}>✍️ Manuel</button>
         </div>
         {photoErr && <div className="syncbar warn" style={{ margin: "0 0 8px" }}>{photoErr}</div>}
+        {barErr && <div className="syncbar warn" style={{ margin: "0 0 8px" }}>{barErr}</div>}
 
         {loading && <div className="small muted center" style={{ padding: 10 }}>Aranıyor…</div>}
         {err && <div className="syncbar warn" style={{ margin: "8px 0" }}>{err}</div>}
@@ -130,6 +155,8 @@ export default function AddFood() {
       )}
 
       <ManualSheet open={manual} onClose={() => setManual(false)} onCreated={(f) => { setManual(false); setPicked(f); }} />
+
+      <BarcodeScanner open={scanning} onClose={() => setScanning(false)} onDetect={onBarcode} />
 
       {detected && (
         <PhotoReviewSheet

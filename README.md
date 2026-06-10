@@ -13,6 +13,7 @@ Kişisel **antrenman** ve **beslenme/makro** takip uygulaması. Tamamen **offlin
 
 ### Beslenme
 - **Yemek arama** — Open Food Facts (ücretsiz, anahtarsız) ile kalori/makro otomatik gelir.
+- **Barkod okutma** — paketli ürünün barkodunu kameraya okut, Open Food Facts'ten otomatik gelir. Tamamen ücretsiz (telefonun yerleşik tarayıcısı + açık veritabanı, anahtar gerekmez).
 - **Manuel ekleme** — kendi yemeğinin makrolarını gir, kaydet, tekrar kullan.
 - Öğünlere göre (kahvaltı/öğle/akşam/atıştırmalık) **günlük kalori ve makro** takibi, hedefe göre kalan/fazla.
 - Günlük geçmiş — geçmiş günlere git, o gün ne yediğini gör.
