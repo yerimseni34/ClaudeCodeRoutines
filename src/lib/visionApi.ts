@@ -56,21 +56,20 @@ const SCHEMA = {
   },
 };
 
-export async function analyzeFoodPhoto(img: DownscaledImage, signal?: AbortSignal): Promise<DetectedFood[]> {
+export async function analyzeFoodPhoto(img: DownscaledImage, hint?: string, signal?: AbortSignal): Promise<DetectedFood[]> {
   const key = getGeminiKey();
   if (!key) throw new Error("no-key");
   const model = getGeminiModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
 
+  const parts: any[] = [{ text: PROMPT }];
+  if (hint && hint.trim()) {
+    parts.push({ text: `Kullanıcının ekstra notu (bunu DİKKATE AL — tahminden daha güvenilir): ${hint.trim()}` });
+  }
+  parts.push({ inline_data: { mime_type: img.mime, data: img.base64 } });
+
   const body = {
-    contents: [
-      {
-        parts: [
-          { text: PROMPT },
-          { inline_data: { mime_type: img.mime, data: img.base64 } },
-        ],
-      },
-    ],
+    contents: [{ parts }],
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: SCHEMA,

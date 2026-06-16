@@ -51,17 +51,29 @@ export default function AddFood() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [detected, setDetected] = useState<DetectedFood[] | null>(null);
   const [photoErr, setPhotoErr] = useState("");
+  // Fotoğraf seçildikten sonra kullanıcıdan opsiyonel ipucu almak için ara adım
+  const [pendingPhoto, setPendingPhoto] = useState<{ file: File; preview: string } | null>(null);
+  const [hint, setHint] = useState("");
 
-  async function onPhoto(file: File) {
-    setPhotoErr("");
+  function onPickPhoto(file: File) {
     if (!hasVision()) {
       setPhotoErr("Önce Profil → Fotoğrafla Kalori bölümünden ücretsiz Gemini anahtarını gir.");
       return;
     }
+    setPhotoErr("");
+    setHint("");
+    setPendingPhoto({ file, preview: URL.createObjectURL(file) });
+  }
+
+  async function runAnalyze() {
+    if (!pendingPhoto) return;
+    const { file } = pendingPhoto;
+    const note = hint;
+    setPendingPhoto(null);
     setPhotoBusy(true);
     try {
       const img = await fileToDownscaledBase64(file, 1024, 0.8);
-      const items = await analyzeFoodPhoto(img);
+      const items = await analyzeFoodPhoto(img, note);
       if (items.length === 0) setPhotoErr("Fotoğrafta yemek tanınamadı. Daha net bir fotoğraf dene.");
       else setDetected(items);
     } catch (e: any) {
@@ -111,7 +123,7 @@ export default function AddFood() {
           {photoBusy ? "🔍 Analiz ediliyor…" : "📷 Fotoğrafla Ekle"}
           <input
             type="file" accept="image/*" style={{ display: "none" }} disabled={photoBusy}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickPhoto(f); e.target.value = ""; }}
           />
         </label>
         <div className="row" style={{ gap: 10, marginBottom: 8 }}>
@@ -156,6 +168,23 @@ export default function AddFood() {
       <ManualSheet open={manual} onClose={() => setManual(false)} onCreated={(f) => { setManual(false); setPicked(f); }} />
 
       <BarcodeScanner open={scanning} onClose={() => setScanning(false)} onDetect={onBarcode} />
+
+      {pendingPhoto && (
+        <Sheet open onClose={() => setPendingPhoto(null)} title="📷 Fotoğrafı Analiz Et">
+          <img src={pendingPhoto.preview} alt="" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 12, marginBottom: 12 }} />
+          <div className="field">
+            <label>Not (opsiyonel ama doğruluğu artırır)</label>
+            <textarea
+              className="textarea" value={hint} onChange={(e) => setHint(e.target.value)} autoFocus
+              placeholder="ör. 3 gözleme: 2 kıymalı 1 peynirli · salataya 2 yk zeytinyağı · yarım porsiyon"
+            />
+          </div>
+          <div className="tiny muted" style={{ marginBottom: 12 }}>
+            Yapay zeka tabağı görür ama içeriği/pişirme detayını bilemez. Buraya yazdıkların tahmini iyileştirir.
+          </div>
+          <button className="btn primary block" onClick={runAnalyze}>Analiz Et</button>
+        </Sheet>
+      )}
 
       {detected && (
         <PhotoReviewSheet
