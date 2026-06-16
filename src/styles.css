@@ -87,6 +87,9 @@ a { color: var(--accent); text-decoration: none; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 12px 16px; border-radius: 12px; font-weight: 700;
   background: var(--card-2); color: var(--text); border: 1px solid var(--line);
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
 }
 .btn:active { transform: scale(0.98); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -143,8 +146,14 @@ a { color: var(--accent); text-decoration: none; }
 .settag.D { color: var(--pink); }
 .settag.N { color: var(--text); }
 .prevcell { text-align: center; color: var(--muted); font-size: 13px; }
-.checkbtn { width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; background: var(--card-2); font-size: 16px; }
+.checkbtn {
+  width: 44px; height: 44px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--card-2); font-size: 16px;
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+}
 .checkbtn.on { background: var(--green); color: #04210f; }
+.iconbtn { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 
 /* Progress / rings */
 .bar { height: 9px; border-radius: 999px; background: var(--bg-2); overflow: hidden; }
@@ -163,13 +172,25 @@ a { color: var(--accent); text-decoration: none; }
 .avatar { width: 40px; height: 40px; border-radius: 11px; background: var(--card-2); display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
 
 /* Sheet / modal */
-.scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40; display: flex; align-items: flex-end; }
+.scrim {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40;
+  display: flex; align-items: flex-end; touch-action: none;
+  overscroll-behavior: contain;
+}
 .sheet {
   background: var(--bg-2); width: 100%; max-width: 560px; margin: 0 auto;
-  border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + var(--safe-bottom));
-  max-height: 92vh; overflow-y: auto; border: 1px solid var(--line); border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  padding: 18px 16px calc(28px + var(--safe-bottom));
+  max-height: 92vh; max-height: 92dvh;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; touch-action: pan-y;
+  border: 1px solid var(--line); border-bottom: none;
   animation: slideup 0.22s ease;
 }
+/* Sheet açıkken alt sekme çubuğu, FAB ve sayfa scroll'u devre dışı (PWA standalone'da
+   alt buton erişilebilirliği için kritik). */
+body.sheet-open .tabbar,
+body.sheet-open .fab { display: none !important; }
 @keyframes slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .sheet .handle { width: 40px; height: 4px; border-radius: 99px; background: var(--line); margin: 0 auto 14px; }
 

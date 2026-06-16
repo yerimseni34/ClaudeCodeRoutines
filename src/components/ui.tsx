@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function TopBar({ title, sub, back, right }: { title: string; sub?: string; back?: boolean; right?: React.ReactNode }) {
@@ -28,6 +28,18 @@ export function Bar({ value, max, variant }: { value: number; max: number; varia
 }
 
 export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: string; children: React.ReactNode }) {
+  // PWA standalone modunda Sheet açıkken: body scroll-lock + tabbar gizleme (sheet-open class).
+  useEffect(() => {
+    if (!open) return;
+    document.body.classList.add("sheet-open");
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.classList.remove("sheet-open");
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
   return (
     <div className="scrim" onClick={onClose}>
