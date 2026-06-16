@@ -63,8 +63,8 @@ function parseWhen(raw: string): number {
 
 function mapSetType(raw: string): SetType {
   const t = (raw || "").trim().toLowerCase();
-  if (t.startsWith("warm")) return "W";
-  if (t.startsWith("fail")) return "F";
+  if (t.startsWith("warm") || t.includes("ısın") || t.includes("isin")) return "W";
+  if (t.startsWith("fail") || t.includes("başar") || t.includes("basar")) return "F";
   if (t.startsWith("drop")) return "D";
   return "N";
 }
@@ -87,16 +87,18 @@ export async function importWorkoutCsv(text: string): Promise<ImportResult> {
   if (rows.length < 2) return { workouts: 0, exercises: 0, sets: 0, error: "Dosya boş ya da okunamadı." };
   const header = rows[0];
 
-  const cTitle = pick(header, "title", "workout name", "workout_name");
-  const cStart = pick(header, "start_time", "date", "workout date");
+  const cTitle = pick(header, "title", "workout name", "workout_name", "antrenman", "workout");
+  const cStart = pick(header, "start_time", "date", "workout date", "tarih");
   const cEnd = pick(header, "end_time");
-  const cEx = pick(header, "exercise_title", "exercise name", "exercise_name", "exercise");
-  const cType = pick(header, "set_type", "set type");
-  const cKg = pick(header, "weight_kg", "weight", "kg");
+  const cEx = pick(header, "exercise_title", "exercise name", "exercise_name", "exercise", "hareket", "egzersiz");
+  const cType = pick(header, "set_type", "set type", "tip", "set tipi");
+  const cKg = pick(header, "weight_kg", "weight", "kg", "ağırlık", "agirlik");
   const cLbs = pick(header, "weight_lbs", "weight (lbs)", "lbs");
-  const cReps = pick(header, "reps", "rep count");
-  const cNotes = pick(header, "exercise_notes", "notes");
+  const cReps = pick(header, "reps", "rep count", "tekrar", "tekrarlar", "tekrar sayısı");
+  const cNotes = pick(header, "exercise_notes", "notes", "not");
   const cWnotes = pick(header, "description", "workout_notes");
+  const cDurSec = pick(header, "duration_seconds", "duration_sec");
+  const cDurMin = pick(header, "duration_min", "duration_minutes", "süre (dk)", "sure (dk)", "süre", "sure", "duration (min)");
 
   if (cEx < 0 || cReps < 0) {
     return { workouts: 0, exercises: 0, sets: 0, error: "Tanınan bir antrenman CSV'si değil (egzersiz/tekrar sütunu yok)." };
@@ -136,6 +138,10 @@ export async function importWorkoutCsv(text: string): Promise<ImportResult> {
     const startedAt = cStart >= 0 ? parseWhen(first[cStart]) : Date.now();
     const endAt = cEnd >= 0 ? parseWhen(first[cEnd]) : startedAt;
     const date = todayKey(new Date(startedAt));
+    let durationSec: number;
+    if (cDurSec >= 0 && num(first[cDurSec]) != null) durationSec = Math.round(num(first[cDurSec])!);
+    else if (cDurMin >= 0 && num(first[cDurMin]) != null) durationSec = Math.round(num(first[cDurMin])! * 60);
+    else durationSec = Math.max(0, Math.round((endAt - startedAt) / 1000));
     const name = (cTitle >= 0 && first[cTitle]?.trim()) || "Antrenman";
 
     // Egzersizleri görülme sırasına göre topla.
@@ -163,7 +169,7 @@ export async function importWorkoutCsv(text: string): Promise<ImportResult> {
       date,
       name,
       startedAt,
-      durationSec: Math.max(0, Math.round((endAt - startedAt) / 1000)),
+      durationSec,
       notes: cWnotes >= 0 ? first[cWnotes] : undefined,
       exercises,
       updatedAt: Date.now(),
