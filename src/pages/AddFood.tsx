@@ -48,7 +48,6 @@ export default function AddFood() {
   }
 
   // Fotoğraf analizi durumu
-  const photoInput = useRef<HTMLInputElement | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [detected, setDetected] = useState<DetectedFood[] | null>(null);
   const [photoErr, setPhotoErr] = useState("");
@@ -108,13 +107,13 @@ export default function AddFood() {
       <div className="page">
         <input className="input" placeholder="Yemek ara (ör. yulaf, tavuk göğsü)…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
 
-        <input
-          ref={photoInput} type="file" accept="image/*" capture="environment" hidden
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
-        />
-        <button className="btn primary block" style={{ margin: "10px 0 8px" }} disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+        <label className="btn primary block" style={{ margin: "10px 0 8px", opacity: photoBusy ? 0.6 : 1 }}>
           {photoBusy ? "🔍 Analiz ediliyor…" : "📷 Fotoğrafla Ekle"}
-        </button>
+          <input
+            type="file" accept="image/*" style={{ display: "none" }} disabled={photoBusy}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
+          />
+        </label>
         <div className="row" style={{ gap: 10, marginBottom: 8 }}>
           <button className="btn ghost grow" disabled={barBusy} onClick={() => setScanning(true)}>
             {barBusy ? "🔎 Aranıyor…" : "📦 Barkod"}

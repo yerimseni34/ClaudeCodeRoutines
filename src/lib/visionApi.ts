@@ -7,7 +7,7 @@ import type { DownscaledImage } from "./image";
 
 const KEY_STORE = "fitlog.gemini.key";
 const MODEL_STORE = "fitlog.gemini.model";
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 export function getGeminiKey(): string {
   return localStorage.getItem(KEY_STORE) || "";
