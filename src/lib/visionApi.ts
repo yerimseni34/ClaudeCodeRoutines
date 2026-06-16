@@ -85,10 +85,19 @@ export async function analyzeFoodPhoto(img: DownscaledImage, signal?: AbortSigna
     signal,
   });
   if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    if (res.status === 400 && txt.includes("API_KEY")) throw new Error("bad-key");
-    if (res.status === 429) throw new Error("Bedava kota dolmuş olabilir, biraz sonra dene.");
-    throw new Error(`Gemini hatası (${res.status})`);
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = j?.error?.message || "";
+    } catch {
+      detail = await res.text().catch(() => "");
+    }
+    const low = detail.toLowerCase();
+    if (res.status === 400 && (low.includes("api key not valid") || low.includes("api_key_invalid"))) throw new Error("bad-key");
+    if (res.status === 403) throw new Error("Erişim reddedildi (403). Anahtarı ve 'Generative Language API'nin açık olduğunu kontrol et. " + detail);
+    if (res.status === 404) throw new Error(`Model bulunamadı (${getGeminiModel()}). Profil'de modeli 'gemini-2.5-flash' ya da 'gemini-flash-latest' yapıp dene. ${detail}`);
+    if (res.status === 429) throw new Error("Kota/limit hatası (429). Yeni anahtar 1-2 dk sonra aktifleşir; ya da Profil'de modeli 'gemini-2.5-flash' dene. " + detail);
+    throw new Error(`Gemini hatası (${res.status}): ${detail}`);
   }
   const data = await res.json();
   const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
